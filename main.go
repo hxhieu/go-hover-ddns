@@ -13,27 +13,15 @@ import (
 
 const IpifyApi string = "https://api.ipify.org"
 
-const HoverUrl string = "https://www.hover.com"
-const HoverLoginApi string = HoverUrl + "/api/login"
-const HoverGetDnsApi string = HoverUrl + "/api/domains/%s/dns"
-const HoverUpdateDnsApi string = HoverUrl + "/api/control_panel/dns"
-
-const ERR_ARGS int = 1
-const ERR_GET_IP int = 2
-const ERR_HOVER_LOGIN int = 3
-const ERR_HOVER_CLIENT int = 4
-const ERR_HOVER_GET_DNS int = 5
-const ERR_HOVER_UPDATE_DNS int = 6
-
 func handleResponse(resp *http.Response, err error, errorCode int) {
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(errorCode)
 	}
 
 	if resp.StatusCode > 200 {
 		bodyText, _ := ioutil.ReadAll(resp.Body)
-		fmt.Printf("%v - %v", resp.StatusCode, string(bodyText))
+		log.Printf("%v - %v", resp.StatusCode, string(bodyText))
 		os.Exit(errorCode)
 	}
 }
@@ -49,16 +37,13 @@ func main() {
 
 	// Get IP
 	resp, err := http.Get(IpifyApi)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(ERR_GET_IP)
-	}
+	handleResponse(resp, err, ERR_GET_IP)
 
 	defer resp.Body.Close()
 
 	ipBody, ipErr := ioutil.ReadAll(resp.Body)
 	if ipErr != nil {
-		fmt.Println(ipErr.Error())
+		log.Println(ipErr.Error())
 		os.Exit(ERR_GET_IP)
 	}
 	ip := string(ipBody)
@@ -69,35 +54,28 @@ func main() {
 	loginJson := fmt.Sprintf("{\"username\":\"%s\", \"password\":\"%s\"}", user, password)
 
 	resp, err = http.Post(HoverLoginApi, "application/json", bytes.NewBufferString(loginJson))
-
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(ERR_HOVER_LOGIN)
-	}
+	handleResponse(resp, err, ERR_HOVER_LOGIN)
 
 	// Create an auth client
 	client, err := CreateHoverClient(resp.Cookies())
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(ERR_HOVER_CLIENT)
 	}
 
 	// Get dns records
 	req, err := http.NewRequest("GET", fmt.Sprintf(HoverGetDnsApi, *domain), nil)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(ERR_HOVER_GET_DNS)
 	}
 
 	resp, err = client.Do(req)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(ERR_HOVER_GET_DNS)
-	}
+	handleResponse(resp, err, ERR_HOVER_GET_DNS)
 
 	dnsBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(ERR_HOVER_GET_DNS)
 	}
 
@@ -105,12 +83,12 @@ func main() {
 
 	err = json.Unmarshal(dnsBody, &dnsResult)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(ERR_HOVER_GET_DNS)
 	}
 
 	if !dnsResult.Succeeded {
-		fmt.Printf("%v - %v - %v", resp.StatusCode, dnsResult.ErrorCode, dnsResult.Error)
+		log.Printf("%v - %v - %v", resp.StatusCode, dnsResult.ErrorCode, dnsResult.Error)
 		os.Exit(ERR_HOVER_GET_DNS)
 	}
 
@@ -123,7 +101,7 @@ func main() {
 	}
 
 	if len(atARecordId) == 0 {
-		fmt.Println("Cannot find the @ A Record")
+		log.Println("Cannot find the @ A Record")
 		os.Exit(ERR_HOVER_GET_DNS)
 	}
 
@@ -145,19 +123,15 @@ func main() {
 	}
 	updateJson, _ := json.Marshal(payload)
 	req, err = http.NewRequest("PUT", HoverUpdateDnsApi, bytes.NewBuffer(updateJson))
+
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Println(err.Error())
 		os.Exit(ERR_HOVER_UPDATE_DNS)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	resp, err = client.Do(req)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(ERR_HOVER_UPDATE_DNS)
-	}
+	handleResponse(resp, err, ERR_HOVER_UPDATE_DNS)
 
-	fmt.Println(resp.StatusCode)
-	fmt.Printf("DNS A record updated with the IP: %s", ip)
-	fmt.Println()
+	log.Printf("%v - DNS A record updated with the IP: %s", resp.StatusCode, ip)
 }
