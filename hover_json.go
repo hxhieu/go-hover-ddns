@@ -23,3 +23,23 @@ type HoverDnsResult struct {
 	ErrorCode string           `json:"error_code"`
 	Domains   []HoverDnsDomain `json:"domains"`
 }
+
+type HoverDnsUpdateRecords struct {
+	Id string `json:"id"`
+}
+
+type HoverDnsUpdateDomain struct {
+	Id      string                  `json:"id"`
+	Records []HoverDnsUpdateRecords `json:"dns_records"`
+}
+
+type HoverDnsUpdateFields struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
+type HoverDnsUpdatePayload struct {
+	Domain HoverDnsUpdateDomain `json:"domain"`
+	Fields HoverDnsUpdateFields `json:"fields"`
+}
